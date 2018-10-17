@@ -1,5 +1,10 @@
 package com.silalahi.valentinus.sso.config;
 
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,9 +14,16 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2UserAuthority;
 import org.thymeleaf.extras.springsecurity5.dialect.SpringSecurityDialect;
+
+import com.silalahi.valentinus.sso.dao.UserDao;
+import com.silalahi.valentinus.sso.entity.Permission;
+import com.silalahi.valentinus.sso.entity.User;
 
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true)
@@ -50,6 +62,9 @@ public class KonfigurasiSecurity extends WebSecurityConfigurerAdapter {
 			.passwordEncoder(passwordEncoder());
 		
 	}*/
+	
+	@Autowired
+	private UserDao userDao;
 
 	@Override
 	protected void configure(HttpSecurity http) throws Exception {
@@ -58,10 +73,45 @@ public class KonfigurasiSecurity extends WebSecurityConfigurerAdapter {
 			.authorizeRequests()
 			.anyRequest().authenticated()
 			.and().logout().permitAll()
-			.and().oauth2Login().defaultSuccessUrl("/home", true);
+			.and().oauth2Login()
+			.userInfoEndpoint()
+			.userAuthoritiesMapper(authoritiesMapper())
+			.and().defaultSuccessUrl("/home", true);
 		
 	}
 	
+	private GrantedAuthoritiesMapper authoritiesMapper() {
+		return (authorities) -> {
+			String emailAttribute = "email";
+			String email = authorities.stream()
+					.filter(OAuth2UserAuthority.class::isInstance)
+					.map(OAuth2UserAuthority.class::cast)
+					.filter(userAuthority -> userAuthority.getAttributes().containsKey(emailAttribute))
+					.map(userAuthority->userAuthority.getAttributes().get(emailAttribute).toString())
+					.findFirst()
+					.orElse(null);
+			
+			if(email == null) {
+				return authorities;
+			}
+			
+			User user = userDao.findByUserName(email);
+			if(user == null) {
+				return authorities;
+			}
+			
+			Set<Permission> userAuthorities = user.getRole().getPermission();
+			if(userAuthorities.isEmpty()) {
+				return authorities;
+			}
+			return Stream.concat(authorities.stream(),
+					userAuthorities.stream()
+					.map(Permission::getValue)
+					.map(SimpleGrantedAuthority::new)
+					).collect(Collectors.toCollection(ArrayList::new));
+		};
+	}
+
 	@Bean
 	public SpringSecurityDialect springSecurityDialect() {
 		return new SpringSecurityDialect();
