@@ -17,6 +17,7 @@ import org.thymeleaf.extras.springsecurity5.dialect.SpringSecurityDialect;
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class KonfigurasiSecurity extends WebSecurityConfigurerAdapter {
 	
+	/*@Autowired
 	private DataSource dataSource;
 	
 	private static final String SQL_LOGIN = 
@@ -48,7 +49,7 @@ public class KonfigurasiSecurity extends WebSecurityConfigurerAdapter {
 			.authoritiesByUsernameQuery(SQL_ROLE)
 			.passwordEncoder(passwordEncoder());
 		
-	}
+	}*/
 
 	@Override
 	protected void configure(HttpSecurity http) throws Exception {
@@ -57,7 +58,7 @@ public class KonfigurasiSecurity extends WebSecurityConfigurerAdapter {
 			.authorizeRequests()
 			.anyRequest().authenticated()
 			.and().logout().permitAll()
-			.and().formLogin().defaultSuccessUrl("/home", true);
+			.and().oauth2Login().defaultSuccessUrl("/home", true);
 		
 	}
 	
